@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam System - Intelligent Assessment Platform</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <!-- Authentication Modal -->
+    <div id="auth-modal" class="modal" style="display: none;">
+        <div class="modal-content auth-content">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h1>Exam System</h1>
+                    <p>Intelligent Assessment Platform with Proctoring</p>
+                </div>
+                
+                <div class="auth-body">
+                    <h2>Sign In</h2>
+                    <p>Sign in with your Google account to get started</p>
+                    
+                    <div id="google-signin-container"></div>
+                    
+                    <div style="margin-top: 20px; text-align: center; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                        <p style="color: var(--text-light); font-size: 14px;">Don't have a Google account? <a href="#" onclick="toggleSignup()" style="color: var(--primary-color);">Sign up instead</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Signup Modal -->
+    <div id="signup-modal" class="modal" style="display: none;">
+        <div class="modal-content auth-content">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h1>Create Account</h1>
+                    <p>Join Exam System</p>
+                </div>
+                
+                <div class="auth-body">
+                    <form id="signup-form" onsubmit="handleSignup(event)">
+                        <div class="form-group">
+                            <label for="signup-name">Full Name</label>
+                            <input type="text" id="signup-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-email">Email</label>
+                            <input type="email" id="signup-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="job-role">Job Role</label>
+                            <select id="job-role" required>
+                                <option value="">Select a job role</option>
+                                <option value="Software Engineer">Software Engineer</option>
+                                <option value="Data Scientist">Data Scientist</option>
+                                <option value="Frontend Developer">Frontend Developer</option>
+                                <option value="Backend Developer">Backend Developer</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Account</button>
+                    </form>
+                    
+                    <div class="auth-footer">
+                        <p>Already have an account? <a href="#" onclick="toggleSignup()" style="color: var(--primary-color);">Sign In</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dashboard -->
+    <div id="dashboard" class="container" style="display: none;">
+        <header class="navbar">
+            <div class="navbar-content">
+                <h1>Exam System</h1>
+                <div class="navbar-right">
+                    <span id="user-name" class="user-name"></span>
+                    <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+                </div>
+            </div>
+        </header>
+        
+        <main class="dashboard-main">
+            <div class="dashboard-header">
+                <h2>Welcome to Your Dashboard</h2>
+                <p>Select a subject to begin your exam</p>
+            </div>
+            
+            <div class="dashboard-content">
+                <!-- Job Role Selection -->
+                <section class="job-selection">
+                    <h3>Select Your Job Role</h3>
+                    <div class="job-roles-grid" id="job-roles-container">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </section>
+                
+                <!-- Subjects for Selected Role -->
+                <section class="subjects-section" id="subjects-section" style="display: none;">
+                    <h3>Available Subjects</h3>
+                    <div class="subjects-grid" id="subjects-container">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </section>
+                
+                <!-- Recent Results -->
+                <section class="results-section">
+                    <h3>Your Recent Exams</h3>
+                    <div class="results-list" id="results-container">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Exam Interface -->
+    <div id="exam-interface" class="container" style="display: none;">
+        <div class="exam-layout">
+            <!-- Left: Questions -->
+            <div class="exam-main">
+                <header class="exam-header">
+                    <div class="exam-title">
+                        <h2 id="subject-title"></h2>
+                        <p id="question-count"></p>
+                    </div>
+                    <div class="exam-timer">
+                        <span id="timer">00:00:00</span>
+                    </div>
+                </header>
+                
+                <div class="exam-content">
+                    <div class="question-container">
+                        <div class="question-number">
+                            Question <span id="current-question">1</span> of <span id="total-questions">50</span>
+                        </div>
+                        <h3 id="question-text" class="question-text"></h3>
+                        
+                        <div class="options-container" id="options-container">
+                            <!-- Options populated by JavaScript -->
+                        </div>
+                        
+                        <div class="question-actions">
+                            <button class="btn btn-secondary" onclick="previousQuestion()">← Previous</button>
+                            <button class="btn btn-primary" onclick="submitAnswer()">Next →</button>
+                            <button class="btn btn-danger" onclick="endExam()">End Exam</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right: Sidebar -->
+            <aside class="exam-sidebar">
+                <!-- Proctoring Status -->
+                <div class="proctoring-panel">
+                    <h4>Proctoring Status</h4>
+                    <div class="proctoring-video">
+                        <video id="proctoring-video" autoplay playsinline></video>
+                        <div class="video-status" id="video-status">
+                            <span class="status-dot"></span>
+                            Monitoring
+                        </div>
+                    </div>
+                    
+                    <div class="proctoring-stats">
+                        <div class="stat">
+                            <span class="stat-label">Face Detected</span>
+                            <span class="stat-value" id="face-status">✓</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Violations</span>
+                            <span class="stat-value" id="violation-count">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Attention</span>
+                            <span class="stat-value" id="attention-level">95%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="violations-list" id="violations-list">
+                        <!-- Violations populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Score Overview -->
+                <div class="score-panel">
+                    <h4>Progress</h4>
+                    <div class="score-display">
+                        <div class="score-item">
+                            <span class="score-label">Correct</span>
+                            <span class="score-value" id="correct-count">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-label">Attempted</span>
+                            <span class="score-value" id="attempted-count">0</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+    
+    <!-- Results Page -->
+    <div id="results-page" class="container" style="display: none;">
+        <div class="results-container">
+            <div class="results-header">
+                <h2>Exam Completed!</h2>
+                <p>Here's your performance summary</p>
+            </div>
+            
+            <div class="results-content">
+                <div class="results-score">
+                    <div class="large-score" id="final-score">0%</div>
+                    <div class="score-status" id="score-status"></div>
+                </div>
+                
+                <div class="results-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Total Questions</span>
+                        <span class="detail-value" id="result-total">0</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Correct Answers</span>
+                        <span class="detail-value" id="result-correct">0</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Accuracy</span>
+                        <span class="detail-value" id="result-accuracy">0%</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Time Taken</span>
+                        <span class="detail-value" id="result-time">0m</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Difficulty Reached</span>
+                        <span class="detail-value" id="result-difficulty">Intermediate</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Violations</span>
+                        <span class="detail-value" id="result-violations">0</span>
+                    </div>
+                </div>
+                
+                <div class="results-actions">
+                    <button class="btn btn-primary" onclick="goToDashboard()">Back to Dashboard</button>
+                    <button class="btn btn-secondary" onclick="downloadCertificate()">Download Report</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="spinner" style="display: none;">
+        <div class="spinner-circle"></div>
+        <p>Loading...</p>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/exam.js"></script>
+    <script src="js/proctoring.js"></script>
+</body>
+</html>

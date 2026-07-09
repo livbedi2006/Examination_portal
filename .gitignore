@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments (never commit these)
+.venv/
+venv/
+backend/venv/
+env/
+ENV/
+
+# Environment & secrets
+.env
+.env.local
+*.pem
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Node (if added later)
+node_modules/
+
+# ML / cache downloads (recreated on install)
+*.pt
+*.onnx
+.cache/
+ultralytics/
