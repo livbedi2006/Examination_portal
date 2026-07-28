@@ -1,5 +1,8 @@
 import os
-from datetime import timedelta
+from dotenv import load_dotenv
+
+# The startup scripts create backend/.env, so load it before reading settings.
+load_dotenv()
 
 class Config:
     # Database
@@ -35,8 +38,10 @@ class Config:
     CORS_ORIGINS = [
         "http://localhost",
         "http://localhost:3000",
+        "http://localhost:8080",
         "http://localhost:8000",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
         "http://127.0.0.1:8000",
     ]
     

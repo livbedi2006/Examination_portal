@@ -61,6 +61,7 @@ class ExamSessionResponse(BaseModel):
     job_role: str
     status: str
     current_difficulty: str
+    questions: List[QuestionData] = []
     total_questions: int
     correct_answers: int
     started_at: Optional[datetime]
@@ -101,6 +102,11 @@ class ProctoringViolation(BaseModel):
     description: str
     timestamp: datetime
     evidence_image_url: Optional[str] = None
+
+class ProctoringViolationCreate(BaseModel):
+    violation_type: str
+    severity: str
+    description: str
 
 class ProctoringStatusResponse(BaseModel):
     is_monitoring: bool

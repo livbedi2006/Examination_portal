@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.database import get_db
-from app.schemas import ProctoringStatusResponse, ProctoringViolation
+from app.schemas import ProctoringStatusResponse, ProctoringViolation, ProctoringViolationCreate
 from app.models.exam import ProctoringRecord
+from app.auth import get_current_user_id
 import uuid
 import asyncio
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/proctoring", tags=["Proctoring"])
 active_sessions = {}
 
 @router.post("/start/{exam_id}")
-async def start_proctoring(exam_id: str, user_id: str):
+async def start_proctoring(exam_id: str, user_id: str = Depends(get_current_user_id)):
     """
     Start proctoring for an exam
     """
@@ -30,7 +31,7 @@ async def start_proctoring(exam_id: str, user_id: str):
 @router.get("/status/{exam_id}", response_model=ProctoringStatusResponse)
 async def get_proctoring_status(
     exam_id: str, 
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -60,10 +61,8 @@ async def get_proctoring_status(
 @router.post("/log-violation/{exam_id}")
 async def log_violation(
     exam_id: str,
-    user_id: str,
-    violation_type: str,
-    severity: str,
-    description: str,
+    request: ProctoringViolationCreate,
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -73,9 +72,9 @@ async def log_violation(
         id=str(uuid.uuid4()),
         user_id=user_id,
         exam_session_id=exam_id,
-        violation_type=violation_type,
-        severity=severity,
-        description=description,
+        violation_type=request.violation_type,
+        severity=request.severity,
+        description=request.description,
         timestamp=datetime.utcnow()
     )
     
@@ -88,7 +87,7 @@ async def log_violation(
 async def websocket_proctoring(
     websocket: WebSocket,
     exam_id: str,
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """

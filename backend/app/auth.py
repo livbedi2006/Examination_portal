@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 import google.auth.transport.requests
 from google.oauth2 import id_token
 from config import Config
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+bearer_scheme = HTTPBearer(auto_error=False)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -42,6 +42,11 @@ def verify_google_token(token: str):
     """
     Verify Google OAuth token and return user info
     """
+    if not Config.GOOGLE_CLIENT_ID or Config.GOOGLE_CLIENT_ID.startswith("YOUR_"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google OAuth is not configured. Set GOOGLE_CLIENT_ID in backend/.env."
+        )
     try:
         idinfo = id_token.verify_oauth2_token(
             token, 
@@ -54,3 +59,15 @@ def verify_google_token(token: str):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Google token"
         )
+
+def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> str:
+    """Read the authenticated user ID from the Bearer JWT."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return verify_token(credentials.credentials)["user_id"]

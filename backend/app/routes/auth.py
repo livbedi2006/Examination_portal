@@ -58,6 +58,8 @@ async def google_auth(request: GoogleAuthRequest, db: Session = Depends(get_db))
             user_id=user.id
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Google auth error: {str(e)}")
         raise HTTPException(

@@ -107,7 +107,7 @@ class APIClient {
     }
 
     async submitAnswer(examId, questionId, answer, timeSpent) {
-        return this.request('/exams/submit-answer', {
+        return this.request(`/exams/submit-answer?exam_id=${encodeURIComponent(examId)}`, {
             method: 'POST',
             body: {
                 question_id: questionId,

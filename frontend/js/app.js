@@ -20,7 +20,9 @@ async function initializeApp() {
     
     // Load frontend configuration
     try {
-        const config = await fetch('http://localhost:8000/config/frontend').then(r => r.json());
+        const configResponse = await fetch(`${api.baseURL}/config/frontend`);
+        if (!configResponse.ok) throw new Error('Backend configuration is unavailable');
+        const config = await configResponse.json();
         localStorage.setItem('GOOGLE_CLIENT_ID', config.google_client_id);
         // Update API base URL if needed
         if (config.backend_url) {
@@ -292,12 +294,12 @@ function renderJobRoles(jobRoles) {
         const card = document.createElement('div');
         card.className = 'job-role-card';
         card.innerHTML = `<h4>${role}</h4>`;
-        card.onclick = () => selectJobRole(role);
+        card.onclick = () => selectJobRole(role, card);
         container.appendChild(card);
     });
 }
 
-async function selectJobRole(role) {
+async function selectJobRole(role, selectedCard) {
     appState.jobRole = role;
     
     try {
@@ -308,7 +310,7 @@ async function selectJobRole(role) {
         document.querySelectorAll('.job-role-card').forEach(card => {
             card.classList.remove('selected');
         });
-        event.target.closest('.job-role-card').classList.add('selected');
+        selectedCard?.classList.add('selected');
         
         // Render subjects
         renderSubjects(data.subjects);

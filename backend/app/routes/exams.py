@@ -8,6 +8,7 @@ from app.schemas import (
 )
 from app.models.exam import ExamSession, ExamStatus, ProctoringRecord
 from app.exam_engine import ExamEngine
+from app.auth import get_current_user_id
 import uuid
 
 router = APIRouter(prefix="/exams", tags=["Exams"])
@@ -17,7 +18,7 @@ exam_engine = ExamEngine()
 @router.post("/start", response_model=ExamSessionResponse)
 async def start_exam(
     request: StartExamRequest, 
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -59,7 +60,7 @@ async def start_exam(
 async def submit_answer(
     request: SubmitAnswerRequest,
     exam_id: str,
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -134,7 +135,7 @@ async def submit_answer(
 @router.post("/complete/{exam_id}", response_model=ExamResultResponse)
 async def complete_exam(
     exam_id: str,
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -175,7 +176,7 @@ async def complete_exam(
 @router.get("/{exam_id}", response_model=ExamSessionResponse)
 async def get_exam_status(
     exam_id: str,
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -194,8 +195,11 @@ async def get_exam_status(
     
     return exam
 
-@router.get("/history/{user_id}", response_model=list[ExamResultResponse])
-async def get_exam_history(user_id: str, db: Session = Depends(get_db)):
+@router.get("/history", response_model=list[ExamResultResponse])
+async def get_exam_history(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
     """
     Get user's exam history
     """
