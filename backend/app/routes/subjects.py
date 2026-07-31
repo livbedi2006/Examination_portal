@@ -51,7 +51,29 @@ JOB_SUBJECTS_MAP = {
             questions_count=35
         ),
     ],
-    "Frontend Developer": [
+    "AI/ML Engineer": [
+        SubjectOption(
+            subject_id="AIML",
+            name="Artificial Intelligence & Machine Learning",
+            description="Machine learning concepts, models, and AI foundations",
+            estimated_duration=120,
+            questions_count=50
+        ),
+        SubjectOption(
+            subject_id="Python Fundamentals",
+            name="Python for Machine Learning",
+            description="Python programming essentials for data and ML work",
+            estimated_duration=90,
+            questions_count=40
+        ),
+        SubjectOption(
+            subject_id="Data Analyst",
+            name="Data Analysis",
+            description="Data preparation, analysis, and visualization",
+            estimated_duration=90,
+            questions_count=40
+        ),
+    ],    "Frontend Developer": [
         SubjectOption(
             subject_id="html_css",
             name="HTML & CSS",
@@ -117,6 +139,13 @@ async def get_subjects_by_job_role(job_role: str):
         subjects=subjects
     )
 
+@router.get("/by-role", response_model=JobRoleSubjects)
+async def get_subjects_by_job_role_query(job_role: str):
+    """Get subjects by query parameter; supports role names containing '/'."""
+    return JobRoleSubjects(
+        job_role=job_role,
+        subjects=JOB_SUBJECTS_MAP.get(job_role, [])
+    )
 @router.get("/all")
 async def get_all_subjects():
     """

@@ -7,6 +7,9 @@ from datetime import datetime
 class GoogleAuthRequest(BaseModel):
     token: str
 
+class GitHubAuthRequest(BaseModel):
+    code: str
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None

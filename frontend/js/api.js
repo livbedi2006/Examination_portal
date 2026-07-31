@@ -63,6 +63,13 @@ class APIClient {
         });
     }
 
+    async githubSignIn(code) {
+        return this.request('/auth/github', {
+            method: 'POST',
+            body: { code },
+        });
+    }
+
     async registerUser(userData) {
         return this.request('/auth/register', {
             method: 'POST',
@@ -87,7 +94,7 @@ class APIClient {
     }
 
     async getSubjectsByJobRole(jobRole) {
-        return this.request(`/subjects/by-role/${jobRole}`);
+        return this.request(`/subjects/by-role?job_role=${encodeURIComponent(jobRole)}`);
     }
 
     async getAllSubjects() {

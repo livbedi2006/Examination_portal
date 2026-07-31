@@ -24,6 +24,7 @@ async function initializeApp() {
         if (!configResponse.ok) throw new Error('Backend configuration is unavailable');
         const config = await configResponse.json();
         localStorage.setItem('GOOGLE_CLIENT_ID', config.google_client_id);
+        localStorage.setItem('GITHUB_CLIENT_ID', config.github_client_id);
         // Update API base URL if needed
         if (config.backend_url) {
             api.baseURL = config.backend_url;
@@ -48,7 +49,16 @@ async function initializeApp() {
             showLoading(false);
         }
     } else {
-        showAuthModal();
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        
+        if (code) {
+            // Clean up the URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            handleGitHubCallback(code);
+        } else {
+            showAuthModal();
+        }
     }
 }
 
@@ -94,6 +104,57 @@ async function authenticateWithGoogle(token) {
     } finally {
         showLoading(false);
     }
+}
+
+async function handleGitHubCallback(code) {
+    try {
+        showLoading(true);
+        const response = await api.githubSignIn(code);
+        
+        if (!response.access_token) {
+            throw new Error('No access token received');
+        }
+        
+        api.setToken(response.access_token);
+        
+        if (response.user_id) {
+            localStorage.setItem('user_id', response.user_id);
+        }
+        
+        try {
+            const user = await api.getCurrentUser();
+            appState.user = user;
+            localStorage.setItem('user_id', user.id);
+        } catch (e) {
+            console.warn('Could not fetch user info:', e);
+        }
+        
+        showNotification('Successfully signed in with GitHub!', 'success');
+        showDashboard();
+    } catch (error) {
+        console.error('GitHub auth error:', error);
+        showNotification(`GitHub sign in failed: ${error.message}`, 'error');
+        localStorage.removeItem('access_token');
+        showAuthModal();
+    } finally {
+        showLoading(false);
+    }
+}
+
+function initiateGitHubSignIn() {
+    let githubClientId = localStorage.getItem('GITHUB_CLIENT_ID');
+    
+    // Check if real client ID is not configured
+    if (!githubClientId || githubClientId.toLowerCase().includes('your-github')) {
+        console.log('GitHub Client ID not configured. Using mock login.');
+        // Bypass real OAuth and just use mock code
+        handleGitHubCallback("mock-github-code");
+        return;
+    }
+    
+    // Redirect to GitHub OAuth
+    const redirectUri = window.location.origin + window.location.pathname;
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${redirectUri}&scope=user:email`;
 }
 
 async function handleManualSignin(event) {
@@ -220,12 +281,12 @@ function initializeGoogleSignIn() {
         let googleClientId = localStorage.getItem('GOOGLE_CLIENT_ID');
         
         // Validate Client ID
-        if (!googleClientId || googleClientId === 'YOUR_GOOGLE_CLIENT_ID' || googleClientId.includes('YOUR_GOOGLE')) {
+        if (!googleClientId || googleClientId.toLowerCase().includes('your-google') || googleClientId.includes('YOUR_GOOGLE')) {
             container.innerHTML = `
-                <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
-                    <strong>⚠️ Google OAuth Not Configured</strong>
-                    <p style="margin: 10px 0 0 0; font-size: 14px;">Please follow the <strong>GOOGLE_OAUTH_SETUP.md</strong> guide to set up Google OAuth with the backend.</p>
-                    <p style="margin: 5px 0 0 0; font-size: 13px;">After setup, the Google Sign-in button will appear here.</p>
+                <div style="background: #e6f7ff; color: #0050b3; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #91d5ff;">
+                    <strong>ℹ️ Mock Google Login</strong>
+                    <p style="margin: 10px 0 0 0; font-size: 14px;">Google OAuth is not configured with real credentials. Click below to test with a mock account.</p>
+                    <button onclick="handleCredentialResponse({credential: 'mock-google-token'})" class="btn btn-primary" style="margin-top: 10px; width: 100%;">Sign in with Mock Google Account</button>
                 </div>
             `;
             return;

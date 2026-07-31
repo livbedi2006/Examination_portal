@@ -53,9 +53,11 @@ class ExamEngine:
             return self._generate_mock_question()
         
         # Filter questions by subject
-        subject_questions = self.questions_df[
-            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False)
-        ]
+        subject_mask = (
+            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
+            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
+        )
+        subject_questions = self.questions_df[subject_mask]
         
         if len(subject_questions) == 0:
             # Fallback to any question if subject-specific not found
@@ -79,16 +81,17 @@ class ExamEngine:
             return self._generate_mock_question()
         
         # Filter by subject and difficulty
+        subject_mask = (
+            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
+            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
+        )
         filtered = self.questions_df[
-            (self.questions_df.get('domain', '').str.contains(subject, case=False, na=False)) &
-            (self.questions_df.get('difficulty', '') == difficulty)
+            subject_mask & (self.questions_df.get('difficulty', '') == difficulty)
         ]
         
         if len(filtered) == 0:
             # Fallback to any difficulty level
-            filtered = self.questions_df[
-                self.questions_df.get('domain', '').str.contains(subject, case=False, na=False)
-            ]
+            filtered = self.questions_df[subject_mask]
         
         if len(filtered) == 0:
             return None

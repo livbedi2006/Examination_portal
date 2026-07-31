@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from app.database import get_db
 from app.auth import create_access_token, verify_google_token, verify_token
 from app.schemas import (
-    GoogleAuthRequest, TokenResponse, UserCreate, UserResponse, UserUpdate
+    GoogleAuthRequest, GitHubAuthRequest, TokenResponse, UserCreate, UserResponse, UserUpdate
 )
 from app.models.user import User
 import uuid
@@ -12,18 +12,123 @@ from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+import requests
+from config import Config
+
+@router.post("/github", response_model=TokenResponse)
+async def github_auth(request: GitHubAuthRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate user with GitHub OAuth code
+    """
+    try:
+        # Check for mock code
+        if request.code == "mock-github-code":
+            email = "mockuser@github.com"
+            name = "GitHub Mock User"
+            github_id = "mock-github-123"
+            picture = "https://avatars.githubusercontent.com/u/9919?s=460&v=4"
+        else:
+            # 1. Exchange code for access token
+            token_response = requests.post(
+                "https://github.com/login/oauth/access_token",
+                headers={"Accept": "application/json"},
+                data={
+                    "client_id": Config.GITHUB_CLIENT_ID,
+                    "client_secret": Config.GITHUB_CLIENT_SECRET,
+                    "code": request.code
+                },
+                timeout=10
+            )
+            token_data = token_response.json()
+            access_token = token_data.get("access_token")
+            
+            if not access_token:
+                raise ValueError("Failed to obtain access token from GitHub")
+                
+            # 2. Get user info
+            user_response = requests.get(
+                "https://api.github.com/user",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10
+            )
+            user_data = user_response.json()
+            github_id = str(user_data.get("id"))
+            name = user_data.get("name") or user_data.get("login")
+            picture = user_data.get("avatar_url")
+            
+            # 3. Get user email
+            email = user_data.get("email")
+            if not email:
+                emails_response = requests.get(
+                    "https://api.github.com/user/emails",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=10
+                )
+                emails_data = emails_response.json()
+                primary_email = next((e for e in emails_data if e.get("primary")), None)
+                if primary_email:
+                    email = primary_email.get("email")
+                elif emails_data:
+                    email = emails_data[0].get("email")
+        
+        # Check if user exists
+        user = db.query(User).filter(User.email == email).first()
+        
+        if not user:
+            # Create new user
+            user = User(
+                id=str(uuid.uuid4()),
+                email=email,
+                name=name,
+                google_id=github_id, # Reusing google_id column or we can just let it be None and rely on email
+                profile_picture=picture,
+                is_active=True
+            )
+            db.add(user)
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        db.commit()
+        db.refresh(user)
+        
+        # Create access token
+        jwt_token = create_access_token(
+            data={"sub": user.id, "email": user.email},
+            expires_delta=timedelta(minutes=30)
+        )
+        
+        return TokenResponse(
+            access_token=jwt_token,
+            token_type="bearer",
+            expires_in=1800,
+            user_id=user.id
+        )
+    except Exception as e:
+        print(f"GitHub auth error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"GitHub authentication failed: {str(e)}"
+        )
+
 @router.post("/google", response_model=TokenResponse)
 async def google_auth(request: GoogleAuthRequest, db: Session = Depends(get_db)):
     """
     Authenticate user with Google OAuth token
     """
     try:
-        # Verify Google token
-        google_user_info = verify_google_token(request.token)
-        google_id = google_user_info.get("sub")
-        email = google_user_info.get("email")
-        name = google_user_info.get("name")
-        picture = google_user_info.get("picture")
+        # Check for mock token
+        if request.token == "mock-google-token":
+            google_id = "mock-google-123"
+            email = "mockgoogle@gmail.com"
+            name = "Google Mock User"
+            picture = "https://lh3.googleusercontent.com/a/mock"
+        else:
+            # Verify Google token
+            google_user_info = verify_google_token(request.token)
+            google_id = google_user_info.get("sub")
+            email = google_user_info.get("email")
+            name = google_user_info.get("name")
+            picture = google_user_info.get("picture")
         
         # Check if user exists
         user = db.query(User).filter(User.google_id == google_id).first()
