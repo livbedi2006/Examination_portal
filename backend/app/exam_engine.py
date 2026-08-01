@@ -46,54 +46,6 @@ class ExamEngine:
         
         except Exception as e:
             print(f"Error loading models: {e}")
-    
-    def get_first_question(self, subject: str) -> Optional[Dict[str, Any]]:
-        """Get the first question for a subject (usually at Intermediate difficulty)"""
-        if self.questions_df is None or len(self.questions_df) == 0:
-            return self._generate_mock_question()
-        
-        # Filter questions by subject
-        subject_mask = (
-            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
-            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
-        )
-        subject_questions = self.questions_df[subject_mask]
-        
-        if len(subject_questions) == 0:
-            # Fallback to any question if subject-specific not found
-            subject_questions = self.questions_df
-        
-        # Get an intermediate difficulty question
-        intermediate = subject_questions[
-            subject_questions.get('difficulty', '') == 'Intermediate'
-        ]
-        
-        if len(intermediate) > 0:
-            question = intermediate.iloc[0]
-        else:
-            question = subject_questions.iloc[0]
-        
-        return self._format_question(question)
-    
-    def get_next_question(self, subject: str, difficulty: str) -> Optional[Dict[str, Any]]:
-        """Get next question based on difficulty level"""
-        if self.questions_df is None or len(self.questions_df) == 0:
-            return self._generate_mock_question()
-        
-        # Filter by subject and difficulty
-        subject_mask = (
-            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
-            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
-        )
-        filtered = self.questions_df[
-            subject_mask & (self.questions_df.get('difficulty', '') == difficulty)
-        ]
-        
-        if len(filtered) == 0:
-            # Fallback to any difficulty level
-            filtered = self.questions_df[subject_mask]
-        
-        if len(filtered) == 0:
             return None
         
         # Random selection to avoid repetition
