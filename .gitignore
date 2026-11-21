@@ -37,6 +37,7 @@ desktop.ini
 *.sqlite
 *.sqlite3
 *.db
+tmp/
 
 # Node (if added later)
 node_modules/
