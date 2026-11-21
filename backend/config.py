@@ -6,7 +6,9 @@ load_dotenv()
 
 class Config:
     # Database
-    _default_db = "sqlite:////tmp/exam_system.db" if os.getenv("VERCEL") else "sqlite:///./exam_system.db"
+    import tempfile
+    _temp_db = os.path.join(tempfile.gettempdir(), "exam_system.db").replace("\\", "/")
+    _default_db = f"sqlite:///{_temp_db}" if os.getenv("VERCEL") else "sqlite:///./exam_system.db"
     DATABASE_URL = os.getenv("DATABASE_URL", _default_db)
     
     # Backend URL for frontend access

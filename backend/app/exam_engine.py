@@ -67,26 +67,27 @@ class ExamEngine:
             return self._generate_mock_question()
         
         # Filter questions by subject
+        domain_col = self.questions_df['domain'] if 'domain' in self.questions_df.columns else pd.Series('', index=self.questions_df.index)
+        topic_col = self.questions_df['topic'] if 'topic' in self.questions_df.columns else pd.Series('', index=self.questions_df.index)
+        
         subject_mask = (
-            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
-            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
+            domain_col.astype(str).str.contains(subject, case=False, na=False) |
+            topic_col.astype(str).str.contains(subject, case=False, na=False)
         )
         subject_questions = self.questions_df[subject_mask]
         
         if len(subject_questions) == 0:
-            # Fallback to any question if subject-specific not found
             subject_questions = self.questions_df
         
-        # Get an intermediate difficulty question
-        intermediate = subject_questions[
-            subject_questions.get('difficulty', '') == 'Intermediate'
-        ]
+        diff_col = 'difficulty_band' if 'difficulty_band' in subject_questions.columns else ('difficulty' if 'difficulty' in subject_questions.columns else None)
         
-        if len(intermediate) > 0:
-            question = intermediate.iloc[0]
-        else:
-            question = subject_questions.iloc[0]
+        if diff_col:
+            intermediate = subject_questions[subject_questions[diff_col].astype(str).str.lower() == 'intermediate']
+            if len(intermediate) > 0:
+                question = intermediate.sample(n=1).iloc[0]
+                return self._format_question(question)
         
+        question = subject_questions.sample(n=1).iloc[0]
         return self._format_question(question)
     
     def get_next_question(self, subject: str, difficulty: str) -> Optional[Dict[str, Any]]:
@@ -94,26 +95,29 @@ class ExamEngine:
         if self.questions_df is None or len(self.questions_df) == 0:
             return self._generate_mock_question()
         
-        # Filter by subject and difficulty
+        domain_col = self.questions_df['domain'] if 'domain' in self.questions_df.columns else pd.Series('', index=self.questions_df.index)
+        topic_col = self.questions_df['topic'] if 'topic' in self.questions_df.columns else pd.Series('', index=self.questions_df.index)
+        
         subject_mask = (
-            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
-            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
+            domain_col.astype(str).str.contains(subject, case=False, na=False) |
+            topic_col.astype(str).str.contains(subject, case=False, na=False)
         )
-        filtered = self.questions_df[
-            subject_mask & (self.questions_df.get('difficulty', '') == difficulty)
-        ]
+        
+        diff_col = 'difficulty_band' if 'difficulty_band' in self.questions_df.columns else ('difficulty' if 'difficulty' in self.questions_df.columns else None)
+        
+        filtered = self.questions_df[subject_mask]
+        if diff_col and len(filtered) > 0:
+            diff_match = filtered[filtered[diff_col].astype(str).str.lower() == difficulty.lower()]
+            if len(diff_match) > 0:
+                filtered = diff_match
         
         if len(filtered) == 0:
-            # Fallback to any difficulty level
-            filtered = self.questions_df[subject_mask]
+            filtered = self.questions_df
         
         if len(filtered) == 0:
             return self._generate_mock_question()
         
-        # Random selection to avoid repetition
-        import random
         question = filtered.sample(n=1).iloc[0]
-        
         return self._format_question(question)
     
     def update_difficulty(self, was_correct: bool, current_difficulty: str) -> str:
