@@ -25,6 +25,12 @@ async function initializeApp() {
         const config = await configResponse.json();
         localStorage.setItem('GOOGLE_CLIENT_ID', config.google_client_id);
         localStorage.setItem('GITHUB_CLIENT_ID', config.github_client_id);
+        if (config.firebase_config && config.firebase_config.apiKey) {
+            window.FIREBASE_CONFIG = config.firebase_config;
+            if (typeof initFirebase === 'function') {
+                initFirebase();
+            }
+        }
         // Update API base URL if needed
         if (config.backend_url) {
             api.baseURL = config.backend_url;
@@ -249,6 +255,8 @@ function showResultsPage() {
 function hideAllViews() {
     document.getElementById('auth-modal').style.display = 'none';
     document.getElementById('signup-modal').style.display = 'none';
+    const fbModal = document.getElementById('firebase-config-modal');
+    if (fbModal) fbModal.style.display = 'none';
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('exam-interface').style.display = 'none';
     document.getElementById('results-page').style.display = 'none';
@@ -262,64 +270,139 @@ function toggleSignup() {
 }
 
 function initializeGoogleSignIn() {
-    // Ensure Google API is loaded
-    if (typeof window.google === 'undefined' || !window.google.accounts) {
-        console.warn('Google Sign-in API not loaded yet');
-        // Schedule retry after a short delay
-        setTimeout(initializeGoogleSignIn, 500);
+    // Check if Firebase is available and configured
+    if (typeof initFirebase === 'function') {
+        initFirebase();
+    }
+}
+
+// ============ FIREBASE GOOGLE AUTH ============
+
+async function signInWithFirebaseGoogle() {
+    if (typeof isFirebaseConfigured === 'function' && !isFirebaseConfigured()) {
+        showNotification('Please enter your Firebase credentials to enable Google Sign-In', 'info');
+        openFirebaseConfigModal();
         return;
     }
-    
-    const container = document.getElementById('google-signin-container');
-    if (!container) {
-        console.error('Google sign-in container not found');
-        return;
-    }
-    
+
     try {
-        // Get Google Client ID from localStorage (loaded from backend config)
-        let googleClientId = localStorage.getItem('GOOGLE_CLIENT_ID');
-        
-        // Validate Client ID
-        if (!googleClientId || googleClientId.toLowerCase().includes('your-google') || googleClientId.includes('YOUR_GOOGLE')) {
-            container.innerHTML = `
-                <div style="background: #e6f7ff; color: #0050b3; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #91d5ff;">
-                    <strong>ℹ️ Mock Google Login</strong>
-                    <p style="margin: 10px 0 0 0; font-size: 14px;">Google OAuth is not configured with real credentials. Click below to test with a mock account.</p>
-                    <button onclick="handleCredentialResponse({credential: 'mock-google-token'})" class="btn btn-primary" style="margin-top: 10px; width: 100%;">Sign in with Mock Google Account</button>
-                </div>
-            `;
-            return;
+        showLoading(true);
+        const auth = initFirebase();
+        if (!auth) {
+            throw new Error('Firebase could not be initialized. Please check credentials.');
         }
-        
-        // Initialize Google Sign-in with callback
-        google.accounts.id.initialize({
-            client_id: googleClientId,
-            callback: handleCredentialResponse,
-            auto_select: false,
-            cancel_on_tap_outside: false,
+
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        const idToken = await user.getIdToken();
+
+        // Send token and user details to backend
+        const response = await api.googleSignIn(idToken, {
+            email: user.email,
+            name: user.displayName,
+            picture: user.photoURL,
         });
-        
-        // Render the button
-        google.accounts.id.renderButton(
-            container,
-            {
-                type: 'standard',
-                theme: 'outline',
-                size: 'large',
-                text: 'signin_with'
-            }
-        );
+
+        if (!response.access_token) {
+            throw new Error('No access token received from backend');
+        }
+
+        api.setToken(response.access_token);
+        if (response.user_id) {
+            localStorage.setItem('user_id', response.user_id);
+        }
+
+        try {
+            const currentUser = await api.getCurrentUser();
+            appState.user = currentUser;
+            localStorage.setItem('user_id', currentUser.id);
+        } catch (e) {
+            appState.user = {
+                name: user.displayName || user.email.split('@')[0],
+                email: user.email,
+                profile_picture: user.photoURL
+            };
+        }
+
+        showNotification('Successfully signed in with Google!', 'success');
+        showDashboard();
     } catch (error) {
-        console.error('Error initializing Google Sign-in:', error);
-        container.innerHTML = `
-            <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; border: 1px solid #f5c6cb;">
-                <strong>Error Initializing Google Sign-in</strong>
-                <p style="margin: 5px 0 0 0; font-size: 14px;">${error.message}</p>
-                <p style="margin: 5px 0 0 0; font-size: 13px;">Check the browser console for more details.</p>
-            </div>
-        `;
+        console.error('Firebase Google Auth error:', error);
+        if (error.code === 'auth/popup-closed-by-user') {
+            showNotification('Google Sign-in was cancelled', 'info');
+        } else if (error.code === 'auth/unauthorized-domain') {
+            showNotification('Domain not authorized in Firebase Console (Authentication > Settings > Authorized Domains)', 'error');
+        } else {
+            showNotification(`Sign in failed: ${error.message}`, 'error');
+        }
+    } finally {
+        showLoading(false);
     }
+}
+
+function signInWithMockGoogle(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    authenticateWithGoogle('mock-google-token');
+}
+
+function openFirebaseConfigModal(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const config = typeof getFirebaseConfig === 'function' ? getFirebaseConfig() : {};
+    const apiKeyInput = document.getElementById('fb-api-key');
+    const authDomainInput = document.getElementById('fb-auth-domain');
+    const projectIdInput = document.getElementById('fb-project-id');
+    const appIdInput = document.getElementById('fb-app-id');
+
+    if (apiKeyInput && config.apiKey && !config.apiKey.includes('YOUR_FIREBASE')) {
+        apiKeyInput.value = config.apiKey;
+    }
+    if (authDomainInput && config.authDomain && !config.authDomain.includes('YOUR_FIREBASE')) {
+        authDomainInput.value = config.authDomain;
+    }
+    if (projectIdInput && config.projectId && !config.projectId.includes('YOUR_FIREBASE')) {
+        projectIdInput.value = config.projectId;
+    }
+    if (appIdInput && config.appId && !config.appId.includes('YOUR_FIREBASE')) {
+        appIdInput.value = config.appId;
+    }
+
+    const modal = document.getElementById('firebase-config-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeFirebaseConfigModal() {
+    const modal = document.getElementById('firebase-config-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function handleSaveFirebaseConfig(e) {
+    e.preventDefault();
+    const apiKey = document.getElementById('fb-api-key').value.trim();
+    const authDomain = document.getElementById('fb-auth-domain').value.trim();
+    const projectId = document.getElementById('fb-project-id').value.trim();
+    const appId = document.getElementById('fb-app-id').value.trim();
+
+    if (!apiKey || !projectId) {
+        showNotification('Please fill in at least API Key and Project ID', 'error');
+        return;
+    }
+
+    const config = {
+        apiKey,
+        authDomain: authDomain || `${projectId}.firebaseapp.com`,
+        projectId,
+        storageBucket: `${projectId}.appspot.com`,
+        messagingSenderId: "",
+        appId
+    };
+
+    saveFirebaseConfig(config);
+    showNotification('Firebase configuration saved!', 'success');
+    closeFirebaseConfigModal();
+    initFirebase();
 }
 
 // ============ DASHBOARD ============

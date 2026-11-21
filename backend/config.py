@@ -6,7 +6,8 @@ load_dotenv()
 
 class Config:
     # Database
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./exam_system.db")
+    _default_db = "sqlite:////tmp/exam_system.db" if os.getenv("VERCEL") else "sqlite:///./exam_system.db"
+    DATABASE_URL = os.getenv("DATABASE_URL", _default_db)
     
     # Backend URL for frontend access
     BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
@@ -17,7 +18,15 @@ class Config:
     ACCESS_TOKEN_EXPIRE_MINUTES = 30
     REFRESH_TOKEN_EXPIRE_DAYS = 7
     
-    # Google OAuth
+    # Firebase Configuration
+    FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+    FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY", "")
+    FIREBASE_AUTH_DOMAIN = os.getenv("FIREBASE_AUTH_DOMAIN", "")
+    FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "")
+    FIREBASE_MESSAGING_SENDER_ID = os.getenv("FIREBASE_MESSAGING_SENDER_ID", "")
+    FIREBASE_APP_ID = os.getenv("FIREBASE_APP_ID", "")
+
+    # Google OAuth (Legacy / Direct)
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "YOUR_GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "YOUR_GOOGLE_CLIENT_SECRET")
     GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
@@ -40,6 +49,7 @@ class Config:
     
     # CORS
     CORS_ORIGINS = [
+        "*",
         "http://localhost",
         "http://localhost:3000",
         "http://localhost:8080",

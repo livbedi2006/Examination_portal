@@ -16,37 +16,99 @@ class ExamEngine:
         self.vectorizer = None
         self.load_models()
     
+    @staticmethod
+    def _find_file(rel_path: str) -> Optional[str]:
+        candidates = [
+            os.path.join(os.path.dirname(__file__), "..", "..", rel_path),
+            os.path.join(os.path.dirname(__file__), "..", rel_path),
+            os.path.join(os.getcwd(), rel_path),
+            rel_path,
+        ]
+        for p in candidates:
+            normalized = os.path.normpath(os.path.abspath(p))
+            if os.path.exists(normalized):
+                return normalized
+        return None
+
     def load_models(self):
         """Load pre-trained models and question bank"""
         try:
             # Load question bank
-            questions_path = "../data/clean_questions.csv"
-            if os.path.exists(questions_path):
+            questions_path = self._find_file("data/clean_questions.csv") or self._find_file("../data/clean_questions.csv")
+            if questions_path and os.path.exists(questions_path):
                 self.questions_df = pd.read_csv(questions_path)
-                print(f"Loaded {len(self.questions_df)} questions")
+                print(f"Loaded {len(self.questions_df)} questions from {questions_path}")
             else:
-                print(f"Warning: Questions file not found at {questions_path}")
+                print("Warning: Questions file clean_questions.csv not found")
                 self.questions_df = pd.DataFrame()
             
             # Load difficulty model
-            model_path = "../models/difficulty_model.pkl"
-            if os.path.exists(model_path):
+            model_path = self._find_file("models/difficulty_model.pkl") or self._find_file("../models/difficulty_model.pkl")
+            if model_path and os.path.exists(model_path):
                 self.difficulty_model = joblib.load(model_path)
-                print("Loaded difficulty model")
+                print(f"Loaded difficulty model from {model_path}")
             else:
-                print(f"Warning: Difficulty model not found at {model_path}")
+                print("Warning: Difficulty model difficulty_model.pkl not found")
             
             # Load vectorizer
-            vec_path = "../models/tfidf_vectorizer.pkl"
-            if os.path.exists(vec_path):
+            vec_path = self._find_file("models/tfidf_vectorizer.pkl") or self._find_file("../models/tfidf_vectorizer.pkl")
+            if vec_path and os.path.exists(vec_path):
                 self.vectorizer = joblib.load(vec_path)
-                print("Loaded TF-IDF vectorizer")
+                print(f"Loaded TF-IDF vectorizer from {vec_path}")
             else:
-                print(f"Warning: Vectorizer not found at {vec_path}")
+                print("Warning: Vectorizer tfidf_vectorizer.pkl not found")
         
         except Exception as e:
             print(f"Error loading models: {e}")
-            return None
+
+    def get_first_question(self, subject: str) -> Optional[Dict[str, Any]]:
+        """Get the first question for a subject (usually at Intermediate difficulty)"""
+        if self.questions_df is None or len(self.questions_df) == 0:
+            return self._generate_mock_question()
+        
+        # Filter questions by subject
+        subject_mask = (
+            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
+            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
+        )
+        subject_questions = self.questions_df[subject_mask]
+        
+        if len(subject_questions) == 0:
+            # Fallback to any question if subject-specific not found
+            subject_questions = self.questions_df
+        
+        # Get an intermediate difficulty question
+        intermediate = subject_questions[
+            subject_questions.get('difficulty', '') == 'Intermediate'
+        ]
+        
+        if len(intermediate) > 0:
+            question = intermediate.iloc[0]
+        else:
+            question = subject_questions.iloc[0]
+        
+        return self._format_question(question)
+    
+    def get_next_question(self, subject: str, difficulty: str) -> Optional[Dict[str, Any]]:
+        """Get next question based on difficulty level"""
+        if self.questions_df is None or len(self.questions_df) == 0:
+            return self._generate_mock_question()
+        
+        # Filter by subject and difficulty
+        subject_mask = (
+            self.questions_df.get('domain', '').str.contains(subject, case=False, na=False) |
+            self.questions_df.get('topic', '').str.contains(subject, case=False, na=False)
+        )
+        filtered = self.questions_df[
+            subject_mask & (self.questions_df.get('difficulty', '') == difficulty)
+        ]
+        
+        if len(filtered) == 0:
+            # Fallback to any difficulty level
+            filtered = self.questions_df[subject_mask]
+        
+        if len(filtered) == 0:
+            return self._generate_mock_question()
         
         # Random selection to avoid repetition
         import random

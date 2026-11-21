@@ -123,15 +123,19 @@ async def google_auth(request: GoogleAuthRequest, db: Session = Depends(get_db))
             name = "Google Mock User"
             picture = "https://lh3.googleusercontent.com/a/mock"
         else:
-            # Verify Google token
+            # Verify Google / Firebase token
             google_user_info = verify_google_token(request.token)
-            google_id = google_user_info.get("sub")
-            email = google_user_info.get("email")
-            name = google_user_info.get("name")
-            picture = google_user_info.get("picture")
+            google_id = google_user_info.get("sub") or request.token[:32]
+            email = google_user_info.get("email") or request.email or f"{google_id}@example.com"
+            name = google_user_info.get("name") or request.name or email.split("@")[0]
+            picture = google_user_info.get("picture") or request.picture
         
-        # Check if user exists
+        # Check if user exists by google_id or email
         user = db.query(User).filter(User.google_id == google_id).first()
+        if not user and email:
+            user = db.query(User).filter(User.email == email).first()
+            if user:
+                user.google_id = google_id
         
         if not user:
             # Create new user

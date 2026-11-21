@@ -8,7 +8,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Firebase SDKs (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
 </head>
 <body>
     <div id="root"></div>
@@ -24,9 +27,24 @@
                 
                 <div class="auth-body">
                     <h2>Sign In</h2>
-                    <p>Sign in with your Google account to get started</p>
+                    <p>Sign in with your Google account via Firebase</p>
                     
-                    <div id="google-signin-container"></div>
+                    <div id="firebase-signin-container">
+                        <button id="firebase-google-btn" onclick="signInWithFirebaseGoogle()" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; background-color: #ffffff; color: #3c4043; border: 1px solid #dadce0; border-radius: 6px; padding: 10px 16px; font-size: 15px; font-weight: 500; cursor: pointer; transition: background-color .2s, box-shadow .2s; box-shadow: 0 1px 2px rgba(60,64,67,0.15);">
+                            <svg width="20" height="20" viewBox="0 0 48 48">
+                                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.28-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.79l7.97-6.2z"/>
+                                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                            </svg>
+                            <span>Sign in with Google</span>
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 0 4px;">
+                        <a href="#" onclick="openFirebaseConfigModal(event)" style="color: var(--primary-color); text-decoration: none;">⚙️ Firebase Config</a>
+                        <a href="#" onclick="signInWithMockGoogle(event)" style="color: var(--text-light); text-decoration: none;">Test with Mock</a>
+                    </div>
                     
                     <div id="github-signin-container" style="margin-top: 15px;">
                         <button onclick="initiateGitHubSignIn()" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background-color: #24292e; color: white; border: none; padding: 10px; font-size: 16px;">
@@ -270,6 +288,56 @@
         </div>
     </div>
     
+    <!-- Firebase Config Modal -->
+    <div id="firebase-config-modal" class="modal" style="display: none;">
+        <div class="modal-content auth-content">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h1>Firebase Settings</h1>
+                    <p>Connect Google Login via Firebase Authentication</p>
+                </div>
+                
+                <div class="auth-body">
+                    <p style="font-size: 13px; color: var(--text-light); margin-bottom: 15px; line-height: 1.5;">
+                        Paste your Firebase project web credentials below. You can find them in the 
+                        <a href="https://console.firebase.google.com" target="_blank" style="color: var(--primary-color); text-decoration: underline;">Firebase Console</a> 
+                        under <strong>Project Settings &gt; General &gt; Your apps &gt; Web app</strong>.
+                    </p>
+                    
+                    <form id="firebase-config-form" onsubmit="handleSaveFirebaseConfig(event)">
+                        <div class="form-group">
+                            <label for="fb-api-key">API Key</label>
+                            <input type="text" id="fb-api-key" placeholder="AIzaSy..." required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fb-auth-domain">Auth Domain</label>
+                            <input type="text" id="fb-auth-domain" placeholder="your-project-id.firebaseapp.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fb-project-id">Project ID</label>
+                            <input type="text" id="fb-project-id" placeholder="your-project-id" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fb-app-id">App ID</label>
+                            <input type="text" id="fb-app-id" placeholder="1:123456789:web:abcdef" required>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button type="submit" class="btn btn-primary" style="flex: 1;">Save Credentials</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeFirebaseConfigModal()" style="flex: 1;">Cancel</button>
+                        </div>
+                    </form>
+                    
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); text-align: center;">
+                        <button type="button" class="btn" onclick="signInWithMockGoogle(); closeFirebaseConfigModal();" style="width: 100%; background: #e6f7ff; color: #0050b3; border: 1px solid #91d5ff; padding: 10px;">
+                            ⚡ Skip &amp; Sign in with Mock Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Spinner -->
     <div id="loading-spinner" class="spinner" style="display: none;">
         <div class="spinner-circle"></div>

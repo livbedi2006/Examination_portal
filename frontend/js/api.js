@@ -1,5 +1,8 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:8000';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isLocal && (window.location.port === '8080' || window.location.port === '3000')
+    ? 'http://localhost:8000'
+    : window.location.origin;
 const API_TIMEOUT = 10000;
 
 // API Client
@@ -56,11 +59,15 @@ class APIClient {
     }
 
     // ============ AUTHENTICATION ============
-    async googleSignIn(token) {
+    async googleSignIn(token, profile = {}) {
         return this.request('/auth/google', {
             method: 'POST',
-            body: { token },
+            body: { token, ...profile },
         });
+    }
+
+    async firebaseSignIn(token, profile = {}) {
+        return this.googleSignIn(token, profile);
     }
 
     async githubSignIn(code) {
